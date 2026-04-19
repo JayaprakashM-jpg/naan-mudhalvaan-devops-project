@@ -1,0 +1,26 @@
+# Compiled files
+target/
+*.class
+*.war
+
+# IDE files
+.idea/
+*.iml
+.settings/
+.project
+.classpath
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+server.log
+
+# Node modules
+node_modules/
+
+# Environment files
+.env
