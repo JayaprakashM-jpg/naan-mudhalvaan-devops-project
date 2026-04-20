@@ -43,12 +43,13 @@ pipeline {
             }
         }
 
+        // ✅ FIXED DEPLOY STAGE (UPDATED)
         stage('🚀 Deploy to Server') {
             steps {
                 echo 'Deploying application...'
                 script {
 
-                    // SAFE STOP (no failure even if nothing is running)
+                    // Stop any running server on port 8000 (safe)
                     bat '''
                     for /f "tokens=5" %%a in ('netstat -aon ^| find ":8000" ^| find "LISTENING"') do (
                         taskkill /F /PID %%a >nul 2>&1
@@ -56,13 +57,13 @@ pipeline {
                     exit 0
                     '''
 
-                    // Create folder safely
+                    // Create deployment folder
                     bat 'if not exist C:\\temp\\webapp mkdir C:\\temp\\webapp'
 
-                    // Deploy web files
-                    bat 'xcopy /E /I /Y src\\main\\webapp\\* C:\\temp\\webapp\\ >nul'
+                    // Copy WAR file (FIXED PART)
+                    bat 'copy target\\*.war C:\\temp\\webapp\\ >nul'
 
-                    // Start server (non-blocking)
+                    // Start server
                     bat 'start /B python -m http.server 8000 --directory C:\\temp\\webapp'
 
                     echo '✅ Application deployed successfully'
