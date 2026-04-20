@@ -2,14 +2,15 @@ pipeline {
     agent any
 
     tools {
-        maven 'Maven-3.9'   // 👈 MUST match the name in Jenkins
+        maven 'Maven-3.9'
     }
-    
+
     environment {
         MAVEN_OPTS = '-DskipTests'
     }
-    
+
     stages {
+
         stage('📦 Checkout Code') {
             steps {
                 echo 'Cloning repository from GitHub...'
@@ -17,7 +18,7 @@ pipeline {
                 echo '✅ Code successfully checked out'
             }
         }
-        
+
         stage('🔧 Build Application') {
             steps {
                 echo 'Building project with Maven...'
@@ -25,7 +26,7 @@ pipeline {
                 echo '✅ Build completed successfully'
             }
         }
-        
+
         stage('📦 Package Application') {
             steps {
                 echo 'Creating WAR package...'
@@ -33,7 +34,7 @@ pipeline {
                 echo '✅ WAR file created successfully'
             }
         }
-        
+
         stage('📄 Archive Artifact') {
             steps {
                 echo 'Archiving WAR file...'
@@ -41,52 +42,79 @@ pipeline {
                 echo '✅ Artifact archived'
             }
         }
-        
+
         stage('🚀 Deploy to Server') {
             steps {
                 echo 'Deploying application...'
                 script {
-                    bat 'for /f "tokens=5" %%a in (\'netstat -aon ^| find ":8000" ^| find "LISTENING"\') do taskkill /F /PID %%a 2>nul || exit 0'
-                    bat 'mkdir C:\\temp\\webapp 2>nul || exit 0'
-                    bat 'xcopy /E /I /Y src\\main\\webapp\\* C:\\temp\\webapp\\'
+
+                    // SAFE STOP (no failure even if nothing is running)
+                    bat '''
+                    for /f "tokens=5" %%a in ('netstat -aon ^| find ":8000" ^| find "LISTENING"') do (
+                        taskkill /F /PID %%a >nul 2>&1
+                    )
+                    exit 0
+                    '''
+
+                    // Create folder safely
+                    bat 'if not exist C:\\temp\\webapp mkdir C:\\temp\\webapp'
+
+                    // Deploy web files
+                    bat 'xcopy /E /I /Y src\\main\\webapp\\* C:\\temp\\webapp\\ >nul'
+
+                    // Start server (non-blocking)
                     bat 'start /B python -m http.server 8000 --directory C:\\temp\\webapp'
 
-                    echo '✅ Application deployed!'
-                    echo '🌐 Access at: http://localhost:8000'
+                    echo '✅ Application deployed successfully'
+                    echo '🌐 Open: http://localhost:8000'
                 }
             }
         }
-        
+
         stage('🔍 Verify Deployment') {
             steps {
                 echo 'Verifying deployment...'
                 script {
-                    bat 'timeout /t 2 /nobreak >nul'
-                    
+
+                    bat 'timeout /t 3 /nobreak >nul'
+
                     def statusCode = bat(
                         script: 'curl -s -o nul -w "%%{http_code}" http://localhost:8000/index.html',
                         returnStdout: true
                     ).trim()
-                    
+
                     if (statusCode == '200') {
-                        echo "✅ Verification successful! HTTP Status: ${statusCode}"
+                        echo "✅ Deployment verified successfully (HTTP ${statusCode})"
                     } else {
-                        echo "⚠️ Verification returned: ${statusCode}"
+                        echo "⚠️ Warning: HTTP ${statusCode}"
                     }
                 }
             }
         }
     }
-    
+
     post {
         success {
-            echo '✅ CI/CD PIPELINE SUCCESSFUL'
+            echo '''
+            ╔════════════════════════════════════════════╗
+            ║   ✅ CI/CD PIPELINE SUCCESSFUL            ║
+            ║   Application deployed successfully       ║
+            ║   http://localhost:8000                  ║
+            ╚════════════════════════════════════════════╝
+            '''
         }
+
         failure {
-            echo '❌ CI/CD PIPELINE FAILED'
+            echo '''
+            ╔════════════════════════════════════════════╗
+            ║   ❌ CI/CD PIPELINE FAILED                ║
+            ║   Check logs for details                  ║
+            ╚════════════════════════════════════════════╝
+            '''
         }
+
         always {
-            echo "Pipeline execution completed for build #${env.BUILD_NUMBER}"
+            echo "Pipeline finished for build #${env.BUILD_NUMBER}"
         }
     }
 }
