@@ -1,8 +1,11 @@
 pipeline {
     agent any
+
+    tools {
+        maven 'Maven-3.9'   // 👈 MUST match the name in Jenkins
+    }
     
     environment {
-        // Skip tests for now to avoid failures
         MAVEN_OPTS = '-DskipTests'
     }
     
@@ -34,7 +37,6 @@ pipeline {
         stage('📄 Archive Artifact') {
             steps {
                 echo 'Archiving WAR file...'
-                // FIXED: Look for .war file instead of .jar
                 archiveArtifacts artifacts: 'target/*.war', fingerprint: true
                 echo '✅ Artifact archived'
             }
@@ -44,18 +46,11 @@ pipeline {
             steps {
                 echo 'Deploying application...'
                 script {
-                    // Kill any existing HTTP server on port 8000
                     bat 'for /f "tokens=5" %%a in (\'netstat -aon ^| find ":8000" ^| find "LISTENING"\') do taskkill /F /PID %%a 2>nul || exit 0'
-                    
-                    // Create deployment directory
                     bat 'mkdir C:\\temp\\webapp 2>nul || exit 0'
-                    
-                    // Copy web files to deployment directory
                     bat 'xcopy /E /I /Y src\\main\\webapp\\* C:\\temp\\webapp\\'
-                    
-                    // Start Python HTTP server
                     bat 'start /B python -m http.server 8000 --directory C:\\temp\\webapp'
-                    
+
                     echo '✅ Application deployed!'
                     echo '🌐 Access at: http://localhost:8000'
                 }
@@ -66,7 +61,6 @@ pipeline {
             steps {
                 echo 'Verifying deployment...'
                 script {
-                    // Wait a moment for server to start
                     bat 'timeout /t 2 /nobreak >nul'
                     
                     def statusCode = bat(
@@ -86,29 +80,10 @@ pipeline {
     
     post {
         success {
-            echo '''
-            ╔══════════════════════════════════════════════════════════════╗
-            ║                                                              ║
-            ║     ✅  CI/CD PIPELINE EXECUTED SUCCESSFULLY  ✅            ║
-            ║                                                              ║
-            ║     Project: Naan Mudhalvan DevOps Project                   ║
-            ║     Status: DEPLOYMENT SUCCESSFUL                            ║
-            ║                                                              ║
-            ║     Access the website at: http://localhost:8000             ║
-            ║                                                              ║
-            ╚══════════════════════════════════════════════════════════════╝
-            '''
+            echo '✅ CI/CD PIPELINE SUCCESSFUL'
         }
         failure {
-            echo '''
-            ╔══════════════════════════════════════════════════════════════╗
-            ║                                                              ║
-            ║     ❌  CI/CD PIPELINE FAILED  ❌                            ║
-            ║                                                              ║
-            ║     Please check the console output for errors.              ║
-            ║                                                              ║
-            ╚══════════════════════════════════════════════════════════════╝
-            '''
+            echo '❌ CI/CD PIPELINE FAILED'
         }
         always {
             echo "Pipeline execution completed for build #${env.BUILD_NUMBER}"
